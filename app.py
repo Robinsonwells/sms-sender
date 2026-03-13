@@ -64,14 +64,27 @@ def index():
                 number_list = tools.get_number_list(filename)
                 wrong_numbers = tools.check_numbers(number_list, sid, token)
 
+                wrong_set = {tuple(n) for n in wrong_numbers}
+                valid_numbers = [n for n in number_list if tuple(n) not in wrong_set]
+
                 if wrong_numbers:
                     with open(settings.LOG_FILE, "a") as log_file:
                         log_string = f"{datetime.now()} - {len(wrong_numbers)} wrong numbers identified."
                         log_file.write(f"\n{log_string}")
+
+                if not valid_numbers and wrong_numbers:
                     return render_template("wrong_numbers.html", number_list=wrong_numbers)
 
-                number_list = tools.send_messages(number_list, sid, token)
-                return render_template("report.html", number_list=number_list)
+                sent_list = tools.send_messages(valid_numbers, sid, token)
+
+                for row in wrong_numbers:
+                    padded = list(row) + [''] * (3 - len(row))
+                    padded.append("invalid number")
+                    padded.append("")
+                    padded.append("Number failed pre-send validation")
+                    sent_list.append(padded)
+
+                return render_template("report.html", number_list=sent_list)
             else:
                 flash("File type not allowed. Please select a CSV file")
                 return redirect(request.url)
