@@ -1,4 +1,5 @@
 import os
+import logging
 from datetime import datetime
 
 from flask import Flask, request, flash, redirect, render_template, send_from_directory
@@ -9,6 +10,13 @@ import settings
 
 app = Flask(__name__)
 app.config.from_object("settings")
+
+
+@app.errorhandler(Exception)
+def handle_exception(e):
+    logging.error(f"Unhandled exception: {e}", exc_info=True)
+    flash(f"An unexpected error occurred: {e}")
+    return redirect("/")
 
 
 @app.route("/instructions")

@@ -24,9 +24,9 @@
                 <tbody>
                     {% for item in number_list %}
                     <tr>
-                        <td>{{ item[1] }}</td>
-                        <td>{{ item[3] }}</td>
-                        <td>{{ item[4] }}</td>
+                        <td>{{ item[1] if item|length > 1 else '' }}</td>
+                        <td>{{ item[3] if item|length > 3 else 'failed' }}</td>
+                        <td>{{ item[4] if item|length > 4 else '' }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>

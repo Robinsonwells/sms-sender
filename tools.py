@@ -110,26 +110,35 @@ def send_messages(number_list, sid, token):
     client = Client(sid, token)
     flag = 0
     while flag < len(number_list):
+        row = number_list[flag]
+        if len(row) < 3:
+            logging.error(f"Row {flag} has fewer than 3 columns, skipping: {row}")
+            number_list[flag].append("invalid row")
+            number_list[flag].append("")
+            flag += 1
+            continue
         try:
-            sender_chars = [c for c in number_list[flag][0]]
-            logging.info(f"Sending message to: {number_list[flag][1]}")
+            logging.info(f"Sending message to: {row[1]}")
             message = client.messages.create(
-                body=number_list[flag][2],
-                from_=number_list[flag][0],
-                to=number_list[flag][1]
+                body=row[2],
+                from_=row[0],
+                to=row[1]
             )
             number_list[flag].append(message.status)
             number_list[flag].append(message.sid)
             flag += 1
         except TwilioRestException as e:
             logging.error(f"Error occurred in send_messages: {e}")
+            number_list[flag].append("failed")
+            number_list[flag].append("")
             flag += 1  # Skip to the next number
     for item in number_list:
-        try:
-            current_message = client.messages.get(item[4]).fetch()
-            item[3] = current_message.status
-        except TwilioRestException as e:
-            logging.error(f"Error occurred when fetching message status: {e}")
+        if len(item) > 4 and item[4]:
+            try:
+                current_message = client.messages.get(item[4]).fetch()
+                item[3] = current_message.status
+            except TwilioRestException as e:
+                logging.error(f"Error occurred when fetching message status: {e}")
     with open(settings.LOG_FILE, "a") as log_file:
         log_string = f"{datetime.now()} - {len(number_list)} messages sent."
         log_file.write(f"\n{log_string}")
