@@ -61,10 +61,17 @@ def check_numbers(numbers, sid, token):
     client = Client(sid, token)
     numbers_not_found = list()
     for number in numbers:
+        if len(number) < 2 or not number[1].strip():
+            logging.error(f"Row missing phone number, skipping: {number}")
+            numbers_not_found.append(number)
+            continue
         try:
-            client.lookups.phone_numbers(number[1]).fetch()
-        except TwilioRestException as e:
+            client.lookups.phone_numbers(number[1].strip()).fetch()
+        except (TwilioRestException, TwilioException) as e:
             logging.error(f"Error occurred in check_numbers: {e}")
+            numbers_not_found.append(number)
+        except Exception as e:
+            logging.error(f"Unexpected error in check_numbers for {number[1]}: {e}")
             numbers_not_found.append(number)
     return numbers_not_found
 
@@ -115,30 +122,46 @@ def send_messages(number_list, sid, token):
             logging.error(f"Row {flag} has fewer than 3 columns, skipping: {row}")
             number_list[flag].append("invalid row")
             number_list[flag].append("")
+            number_list[flag].append("Row must have 3 columns: from, to, message")
             flag += 1
             continue
         try:
-            logging.info(f"Sending message to: {row[1]}")
+            to_number = row[1].strip()
+            from_number = row[0].strip()
+            if not to_number or not from_number:
+                raise ValueError(f"Missing phone number — from: '{from_number}', to: '{to_number}'")
+            logging.info(f"Sending message to: {to_number}")
             message = client.messages.create(
                 body=row[2],
-                from_=row[0],
-                to=row[1]
+                from_=from_number,
+                to=to_number
             )
             number_list[flag].append(message.status)
             number_list[flag].append(message.sid)
+            number_list[flag].append("")
             flag += 1
-        except TwilioRestException as e:
-            logging.error(f"Error occurred in send_messages: {e}")
+        except (TwilioRestException, TwilioException) as e:
+            error_msg = e.msg if hasattr(e, 'msg') else str(e)
+            logging.error(f"Twilio error in send_messages for row {flag}: {e}")
             number_list[flag].append("failed")
             number_list[flag].append("")
-            flag += 1  # Skip to the next number
+            number_list[flag].append(error_msg)
+            flag += 1
+        except Exception as e:
+            logging.error(f"Unexpected error in send_messages for row {flag}: {e}")
+            number_list[flag].append("failed")
+            number_list[flag].append("")
+            number_list[flag].append(str(e))
+            flag += 1
     for item in number_list:
         if len(item) > 4 and item[4]:
             try:
                 current_message = client.messages.get(item[4]).fetch()
                 item[3] = current_message.status
-            except TwilioRestException as e:
+            except (TwilioRestException, TwilioException) as e:
                 logging.error(f"Error occurred when fetching message status: {e}")
+            except Exception as e:
+                logging.error(f"Unexpected error fetching message status: {e}")
     with open(settings.LOG_FILE, "a") as log_file:
         log_string = f"{datetime.now()} - {len(number_list)} messages sent."
         log_file.write(f"\n{log_string}")
